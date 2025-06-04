@@ -54,8 +54,9 @@ pub fn main() !void {
             c.r = @floatCast(vg);
             c.g = @floatCast(vg);
             c.b = @floatCast(vg);
-            c.a = @floatCast((1 - vg) * (1 - vg));
+            c.a = @floatCast(std.math.pow(f64, @min(1, @max(1 - vg, 0)), 6.0));
         }
+
         try image.convert(.rgba32);
         const sargs = [_]string{ file, "_t.png" };
         const all_args = try std.mem.concat(allocator, u8, &sargs);

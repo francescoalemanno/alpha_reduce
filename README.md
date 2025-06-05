@@ -24,7 +24,7 @@ Processes each input file and creates corresponding `*_t.png` outputs.
 2. Calculate mean and standard deviation of pixels with brightness > 0.5
 3. Set threshold as `mean - 1.9 × standard_deviation`
 4. Normalise pixel values against threshold
-5. Apply gamma correction (γ = 6.0)
+5. Apply gamma correction (γ = 4.0)
 6. Generate alpha channel where transparency increases with brightness
 
 ## Building

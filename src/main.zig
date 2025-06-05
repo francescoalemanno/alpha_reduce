@@ -50,7 +50,7 @@ pub fn main() !void {
             const c = &image.pixels.float32[i];
             const bw = (@as(f64, c.r) + @as(f64, c.g) + @as(f64, c.b)) / 3.0;
             const v = @min(@max(bw / threshold, @as(f64, 0)), @as(f64, 1));
-            const vg = std.math.pow(f64, v, @as(f64, 6.0));
+            const vg = std.math.pow(f64, v, @as(f64, 4.0));
             const alpha = @min(1, @max(1 - vg, 0));
             c.a = @floatCast(alpha);
             if (alpha > 0) {

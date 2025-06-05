@@ -51,10 +51,14 @@ pub fn main() !void {
             const bw = (@as(f64, c.r) + @as(f64, c.g) + @as(f64, c.b)) / 3.0;
             const v = @min(@max(bw / threshold, @as(f64, 0)), @as(f64, 1));
             const vg = std.math.pow(f64, v, @as(f64, 6.0));
-            c.r = @floatCast(vg);
-            c.g = @floatCast(vg);
-            c.b = @floatCast(vg);
-            c.a = @floatCast(std.math.pow(f64, @min(1, @max(1 - vg, 0)), 6.0));
+            const alpha = @min(1, @max(1 - vg, 0));
+            c.a = @floatCast(alpha);
+            if (alpha > 0) {
+                const destcol = @min(1, @max((vg - (1 - alpha)) / alpha, 0));
+                c.r = @floatCast(destcol);
+                c.g = @floatCast(destcol);
+                c.b = @floatCast(destcol);
+            }
         }
 
         try image.convert(.rgba32);

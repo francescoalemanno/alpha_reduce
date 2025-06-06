@@ -24,8 +24,7 @@ pub fn main() !void {
         const rough_threshold = 0.5;
         // Calculate the average and standard deviation of the pixel brightness
         // values, ignoring pixels below a rough threshold.
-        for (0..image.pixels.float32.len) |i| {
-            const c = &image.pixels.float32[i];
+        for (image.pixels.float32) |*c| {
             const v = (@as(f64, c.r) + @as(f64, c.g) + @as(f64, c.b)) / 3.0;
             if (v > rough_threshold) {
                 v0 += 1;
@@ -46,8 +45,7 @@ pub fn main() !void {
         print("threshold: {d}\n", .{threshold});
         // Apply the threshold to the pixel brightness values
         // and convert to a grayscale image with alpha channel
-        for (0..image.pixels.float32.len) |i| {
-            const c = &image.pixels.float32[i];
+        for (image.pixels.float32) |*c| {
             const bw = (@as(f64, c.r) + @as(f64, c.g) + @as(f64, c.b)) / 3.0;
             const v = @min(@max(bw / threshold, @as(f64, 0)), @as(f64, 1));
             const vg = std.math.pow(f64, v, @as(f64, 4.0));

@@ -2,53 +2,82 @@ const std = @import("std");
 const zigimg = @import("zigimg");
 const print = std.debug.print;
 const string = []const u8;
+
+fn Value(c: *const zigimg.color.Colorf32) f64 {
+    return (@as(f64, c.r) + @as(f64, c.g) + @as(f64, c.b)) / 3.0;
+}
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
-    const args = try std.process.argsAlloc(allocator);
-    if (args.len < 2) {
-        print("Usage: {s} <image files>\n", .{args[0]});
-        return error.InvalidArguments;
-    }
-    defer std.process.argsFree(allocator, args);
-    for (args[1..]) |file| {
-        var image = try zigimg.Image.fromFilePath(allocator, file);
-        defer image.deinit();
-        print("processing {s}\n", .{file});
 
-        try image.convert(.float32);
-        var v0: f64 = 0.0;
-        var v1: f64 = 0.0;
-        var v2: f64 = 0.0;
-        const rough_threshold = 0.5;
-        // Calculate the average and standard deviation of the pixel brightness
-        // values, ignoring pixels below a rough threshold.
-        for (image.pixels.float32) |*c| {
-            const v = (@as(f64, c.r) + @as(f64, c.g) + @as(f64, c.b)) / 3.0;
-            if (v > rough_threshold) {
-                v0 += 1;
-                v1 += v;
-                v2 += v * v;
+    var argi = try std.process.argsWithAllocator(allocator);
+    defer argi.deinit();
+
+    const pname = argi.next() orelse @panic("missing args");
+    print("Usage: {s} [-g 4.0 #gamma] [-t 0.5 #threshold] <image files>\n", .{pname});
+
+    var gamma: f64 = 4.0;
+    while (argi.next()) |arg| {
+        // parse basic CLI args
+        var cmd_enabled: bool = true;
+        inline for (.{&gamma}, .{"-g"}) |par, cmd| {
+            if (cmd_enabled and std.mem.eql(u8, arg, cmd)) {
+                const par_s = argi.next() orelse std.debug.panic("missing argument for parameter {s}.", .{cmd});
+                par.* = std.fmt.parseFloat(f64, par_s) catch std.debug.panic("invalid float for parameter {s}.", .{cmd});
+                cmd_enabled = false;
             }
         }
-        if (v0 <= 0.5) {
-            print("No pixels above rough threshold {d}, skipping image.\n", .{rough_threshold});
-            continue;
+        if (!cmd_enabled) continue;
+        // process image
+        const file = arg;
+        print("processing {s}\n", .{file});
+        var image = try zigimg.Image.fromFilePath(allocator, file);
+        defer image.deinit();
+
+        try image.convert(.float32);
+
+        // Calculate the average and standard deviation of the pixel brightness
+        // values, ignoring pixels below a rough threshold.
+        var best_threshold: f64 = 0.5;
+        var best_variance: f64 = -1;
+        for (0..256) |it| {
+            const th = @as(f64, @floatFromInt(it)) / 255.0;
+            var mu1: f64 = 0.0;
+            var mu2: f64 = 0.0;
+            var n1: f64 = 0.0;
+            var n2: f64 = 0.0;
+            for (image.pixels.float32) |*c| {
+                const v = Value(c);
+                if (v > th) {
+                    mu2 += v;
+                    n2 += 1;
+                } else {
+                    mu1 += v;
+                    n1 += 1;
+                }
+            }
+            if (n1 <= 0.5 or n2 <= 0.5) continue;
+            const o1 = n1 / (n1 + n2);
+            const o2 = n2 / (n1 + n2);
+            mu1 /= n1;
+            mu2 /= n2;
+            const variance = o1 * o2 * (mu1 - mu2) * (mu1 - mu2);
+            if (variance > best_variance) {
+                print("improved variance {d}, th: {d}\n", .{ variance, th });
+                best_threshold = th;
+                best_variance = variance;
+            }
         }
-        v2 /= v0;
-        v1 /= v0;
-        // dev is the standard deviation of the pixel brightness values
-        // v1 is the average brightness value
-        const dev = @sqrt(@max(v2 - v1 * v1, @as(f64, 0.0)));
-        const threshold = @max(v1 - 1.9 * dev, rough_threshold);
+
+        const threshold = best_threshold;
         print("threshold: {d}\n", .{threshold});
         // Apply the threshold to the pixel brightness values
         // and convert to a grayscale image with alpha channel
         for (image.pixels.float32) |*c| {
-            const bw = (@as(f64, c.r) + @as(f64, c.g) + @as(f64, c.b)) / 3.0;
+            const bw = Value(c);
             const v = @min(@max(bw / threshold, @as(f64, 0)), @as(f64, 1));
-            const vg = std.math.pow(f64, v, @as(f64, 4.0));
+            const vg = std.math.pow(f64, v, gamma);
             const alpha = @min(1, @max(1 - vg, 0));
             c.a = @floatCast(alpha);
             if (alpha > 0) {

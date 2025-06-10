@@ -45,12 +45,14 @@ pub fn main() !void {
             const th = @as(f64, @floatFromInt(it)) / 255.0;
             var mu1: f64 = 0.0;
             var mu2: f64 = 0.0;
+            var mu22: f64 = 0.0;
             var n1: f64 = 0.0;
             var n2: f64 = 0.0;
             for (image.pixels.float32) |*c| {
                 const v = Value(c);
                 if (v > th) {
                     mu2 += v;
+                    mu22 += v * v;
                     n2 += 1;
                 } else {
                     mu1 += v;
@@ -62,11 +64,12 @@ pub fn main() !void {
             const o2 = n2 / (n1 + n2);
             mu1 /= n1;
             mu2 /= n2;
+            mu22 /= n2;
             const variance = o1 * o2 * (mu1 - mu2) * (mu1 - mu2);
             if (variance > best_variance) {
-                print("improved variance {d}, th: {d}\n", .{ variance, th });
-                best_threshold = th;
+                best_threshold = @max(th, mu2 - 3.0 * std.math.sqrt(@max(mu22 - mu2 * mu2, 0.0)));
                 best_variance = variance;
+                print("improved variance {d}, th: {d}\n", .{ best_variance, best_threshold });
             }
         }
 
